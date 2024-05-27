@@ -1,3 +1,20 @@
+class TreeNode:
+    def __init__(self, symbol):
+        self.symbol = symbol
+        self.children = []
+
+    def add_child(self, child):
+        self.children.append(child)
+
+    def __str__(self):
+        return self._str(0)
+
+    def _str(self, level):
+        ret = "\t" * level + repr(self.symbol) + "\n"
+        for child in self.children:
+            ret += child._str(level + 1)
+        return ret
+    
 class SLRParser:
     def __init__(self, parsing_table, grammar): 
         self.parsing_table = parsing_table
@@ -5,44 +22,52 @@ class SLRParser:
         self.stack = []
         self.input_tokens = []
         self.position = 0
+        self.tree_stack = []
 
     def parse(self, tokens): 
         self.input_tokens = tokens
         self.position = 0
         self.stack = [0]
+        self.tree_stack = []
 
         while True:
             state = self.stack[-1]
             current_token = self.input_tokens[self.position] if self.position < len(self.input_tokens) else '$'
 
-            action = self.parsing_table.get((state, current_token)) # parsing table에서 Decision 받아오기
-            if not action:
-                self.error("Unexpected token: " + current_token)
+            action = self.parsing_table.get((state, current_token)) 
+            
+            if not action: # REJECT
+                print(f"There is no ACTION for ({state}, {current_token})")
+                print("current stack state: ",self.stack)
+                print()
                 return
 
             if action[0] == 's': # SHIFT
                 self.stack.append(int(action[1:])) 
                 self.position += 1
+                self.tree_stack.append(TreeNode(current_token))
             elif action[0] == 'r': # REDUCE
                 production = self.grammar[int(action[1:])] 
                 lhs, rhs = production
 
-                for _ in range(len(rhs)):
-                    self.stack.pop()
+                node = TreeNode(lhs)
+                
+                if rhs != ['ε']:
+                    for _ in range(len(rhs)):
+                        self.stack.pop()
+                        node.add_child(self.tree_stack.pop())
+
+                node.children.reverse()
+                self.tree_stack.append(node)
 
                 state = self.stack[-1]
                 self.stack.append(self.parsing_table[(state, lhs)]) # GOTO
             elif action == 'acc': # ACCEPT
-                print("Parsing successful!")
+                print("ACCEPT")
+                for i in self.tree_stack:
+                    print(i)
                 return
-            else: # REJECT
-                self.error("Invalid action: " + action)
-                return
-
-    def error(self, message):
-        print("Error: " + message)
-        # Additional error handling can be done here
-
+            
 # SLR parsing table 
 parsing_table = {
     (0, 'vtype'): 's5',
@@ -69,7 +94,7 @@ parsing_table = {
     (7, 'assign'): 's11',
     (7, 'lparen'): 's10',
     (8, 'semi'): 's12',
-    (9, 'vtype'): 's5',
+    (9, 'vtype'): 'r5',
     (9, 'id'): 'r5',
     (9, 'rbrace'): 'r5',
     (9, 'if'): 'r5',
@@ -116,8 +141,8 @@ parsing_table = {
     (22, 'lparen'): 's22',
     (22, 'num'): 's24',
     (22, 'EXPR'): 29,
-    (22, 'TERM'): 30,
-    (22, 'FACTOR'): 31,
+    (22, 'TERM'): 20,
+    (22, 'FACTOR'): 21,
     (23, 'semi'): 'r17',
     (23, 'addsub'): 'r17',
     (23, 'multdiv'): 'r17',
@@ -177,7 +202,7 @@ parsing_table = {
     (37, 'ASSIGN'): 39,
     (37, 'BLOCK'): 47,
     (37, 'STMT'): 37,
-    (38, 'vtype'): 's42',
+    (38, 'vtype'): 'r26',
     (38, 'id'): 'r26',
     (38, 'rbrace'): 'r26',
     (38, 'if'): 'r26',
@@ -220,7 +245,7 @@ parsing_table = {
     (51, 'semi'): 's9',
     (51, 'assign'): 's11',
     (52, 'rparen'): 'r23',
-    (52, 'if'): 's32',
+    (52, 'comma'): 's32',
     (52, 'MOREARGS'): 60,
     (53, 'vtype'): 'r19',
     (53, '$'): 'r19',
@@ -237,7 +262,7 @@ parsing_table = {
     (58, 'comp'): 'r33',
     (59, 'rparen'): 's65',
     (59, 'comp'): 's63',
-    (50, 'rparen'): 'r22',
+    (60, 'rparen'): 'r22',
     (61, 'rbrace'): 'r36',
     (62, 'lbrace'): 's66',
     (63, 'boolstr'): 's58',
@@ -304,6 +329,7 @@ parsing_table = {
     (76, 'BLOCK'): 77,
     (76, 'STMT'): 37,
     (77, 'rbrace'): 's78',
+    (78, 'vtype'): 'r34',
     (78, 'id'): 'r34',
     (78, 'rbrace'): 'r34',
     (78, 'if'): 'r34',
@@ -354,7 +380,8 @@ grammar = [
 
 # 파일 받아서 텍스트 파일로 구현하기
 # Example input sequence
-tokens = ['vtype', 'id', 'semi', 'vtype', 'id', 'lparen', 'rparen', 'lbrace', 'if', 'lparen', 'boolstr', 'comp', 'boolstr', 'rparen', 'lbrace', 'rbrace', 'return', 'id', 'semi', 'rbrace']
+# ACCEPT tokens = ['vtype', 'id', 'semi', 'vtype', 'id', 'lparen', 'rparen', 'lbrace', 'if', 'lparen', 'boolstr', 'comp', 'boolstr', 'rparen', 'lbrace', 'rbrace', 'return', 'id', 'semi', 'rbrace']
+# REJECT tokens = ['vtype', 'id', 'vtype', 'id', 'lparen', 'rparen', 'lbrace', 'if', 'lparen', 'boolstr', 'comp', 'boolstr', 'rparen', 'lbrace', 'rbrace', 'return', 'id', 'semi', 'rbrace']
 
 parser = SLRParser(parsing_table, grammar)
 parser.parse(tokens)
