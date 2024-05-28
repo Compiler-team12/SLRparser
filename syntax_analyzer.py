@@ -1,14 +1,19 @@
+import sys
+
+ # 파스트리 출력을 위한 TreeNode
 class TreeNode:
     def __init__(self, symbol):
         self.symbol = symbol
         self.children = []
 
-    def add_child(self, child):
+    # child 노드 생성
+    def add_child(self, child): 
         self.children.append(child)
 
     def __str__(self):
         return self._str(0)
 
+    # Parse Tree 출력
     def _str(self, level):
         ret = "\t" * level + repr(self.symbol) + "\n"
         for child in self.children:
@@ -19,27 +24,28 @@ class SLRParser:
     def __init__(self, parsing_table, grammar): 
         self.parsing_table = parsing_table
         self.grammar = grammar
-        self.stack = []
-        self.input_tokens = []
-        self.position = 0
-        self.tree_stack = []
+        # spiltter를 대신하여 입력된 토큰의 위치를 나타내는 position 변수
+        self.position = 0 
+        # state를 저장하는 stack 변수
+        self.stack = [0] 
+        # token들(terminal, nonterminal)을 저장하고 parse tree 구조를 생성하는데 사용되는 tree_stack 변수
+        self.tree_stack = [] 
 
+    # SLR parse를 진행하는 함수 parse
     def parse(self, tokens): 
-        self.input_tokens = tokens
-        self.position = 0
-        self.stack = [0]
-        self.tree_stack = []
-
+        self.input_tokens = tokens 
         while True:
             state = self.stack[-1]
+            # 현재 토큰 저장, 토큰 길이를 초과하면 '$' 저장 
             current_token = self.input_tokens[self.position] if self.position < len(self.input_tokens) else '$'
 
             action = self.parsing_table.get((state, current_token)) 
             
             if not action: # REJECT
+                print("REJECT")
+                # Error Report
                 print(f"There is no ACTION for ({state}, {current_token})")
                 print("current stack state: ",self.stack)
-                print()
                 return
 
             if action[0] == 's': # SHIFT
@@ -49,23 +55,26 @@ class SLRParser:
             elif action[0] == 'r': # REDUCE
                 production = self.grammar[int(action[1:])] 
                 lhs, rhs = production
-
+                              
+                # rhs의 길이에 해당하는 개수의 state들을 pop 및 lhs로 reduce되는 parse tree 표현을 위한 child 노드에 토큰들 추가
                 node = TreeNode(lhs)
-                
                 if rhs != ['ε']:
                     for _ in range(len(rhs)):
                         self.stack.pop()
                         node.add_child(self.tree_stack.pop())
 
-                node.children.reverse()
+                # 리스트 순서를 반전시켜 먼저 진행된 순서대로 pop
+                node.children.reverse() 
                 self.tree_stack.append(node)
 
                 state = self.stack[-1]
                 self.stack.append(self.parsing_table[(state, lhs)]) # GOTO
             elif action == 'acc': # ACCEPT
                 print("ACCEPT")
-                for i in self.tree_stack:
-                    print(i)
+                node = TreeNode('CODE')
+                while self.tree_stack:
+                    node.add_child(self.tree_stack.pop())
+                print(node)
                 return
             
 # SLR parsing table 
@@ -378,10 +387,21 @@ grammar = [
     ('RETURN', ['return', 'RHS', 'semi']),
 ]
 
-# 파일 받아서 텍스트 파일로 구현하기
-# Example input sequence
 # ACCEPT tokens = ['vtype', 'id', 'semi', 'vtype', 'id', 'lparen', 'rparen', 'lbrace', 'if', 'lparen', 'boolstr', 'comp', 'boolstr', 'rparen', 'lbrace', 'rbrace', 'return', 'id', 'semi', 'rbrace']
 # REJECT tokens = ['vtype', 'id', 'vtype', 'id', 'lparen', 'rparen', 'lbrace', 'if', 'lparen', 'boolstr', 'comp', 'boolstr', 'rparen', 'lbrace', 'rbrace', 'return', 'id', 'semi', 'rbrace']
 
-parser = SLRParser(parsing_table, grammar)
-parser.parse(tokens)
+def read_file(file_path):
+    try:
+        with open(file_path, 'r') as file:
+            return file.read().strip()
+    except FileNotFoundError:
+        print(f"Error: File '{file_path}' not found.")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print("The execution flow of syntax analyzer: python syntax_analyzer.py input.txt")
+    else:
+        tokens = read_file(sys.argv[1]).split()
+        parser = SLRParser(parsing_table, grammar)
+        parser.parse(tokens)
